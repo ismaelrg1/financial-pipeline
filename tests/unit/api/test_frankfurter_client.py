@@ -10,6 +10,10 @@ from financial_pipeline.config import Settings
 
 BASE_URL = "https://api.frankfurter.dev/v2"
 PROVIDER = "ECB"
+DATABASE_URL = (
+    "postgresql+psycopg://test_user:"
+    "test_password@localhost:5432/test_database"
+)
 
 # Fake settings without loading the real .env file.
 @pytest.fixture
@@ -19,6 +23,7 @@ def settings() -> Settings:
         _env_file=None,
         frankfurter_api_base_url=BASE_URL,
         frankfurter_provider=PROVIDER,
+        database_url=DATABASE_URL,
     )
 
 # Valid API response payload.

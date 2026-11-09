@@ -18,3 +18,6 @@ class Settings(BaseSettings):
     frankfurter_base_currency: str = "EUR"
     frankfurter_quote_currencies: tuple[str, ...] = ("USD", "GBP", "JPY")
     http_timeout_seconds: int = Field(default=10, gt=0)
+
+    # DB
+    database_url: str
