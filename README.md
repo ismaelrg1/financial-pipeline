@@ -1,6 +1,7 @@
 # Financial Exchange-Rate Pipeline
 
-> **Status:** Planning. The scope is defined; implementation has not started.
+> **Status:** In progress. API validation, PostgreSQL infrastructure,
+> Alembic migrations, ORM models, and integration tests are implemented.
 
 ## Objective
 
