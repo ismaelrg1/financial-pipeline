@@ -7,7 +7,9 @@ from pydantic import TypeAdapter
 from financial_pipeline.api.schemas import FrankfurterRateResponse
 from financial_pipeline.config import Settings
 
+
 rate_list_adapter = TypeAdapter(list[FrankfurterRateResponse])
+
 
 class FrankfurterClient:
     def __init__(
@@ -18,14 +20,21 @@ class FrankfurterClient:
         self._http_client = http_client
         self._settings = settings
 
+
     def get_rates(
         self, *, base_currency: str,
         quote_currencies: Sequence[str],
         start_date: date,
         end_date: date,
     ) -> list[FrankfurterRateResponse]:
+
+        url = (
+            f"{self._settings.frankfurter_api_base_url}"
+            f"/providers/{self._settings.frankfurter_provider}/rates"
+        )
+        
         response = self._http_client.get(
-            slef._settings.frankfurter_api_urls,
+            url,
             params={
                 "base": base_currency,
                 "quotes": ",".join(quote_currencies),
@@ -35,4 +44,4 @@ class FrankfurterClient:
         )
         response.raise_for_status()
 
-        return rate_list_adpater.validate_python(response.json())
+        return rate_list_adapter.validate_python(response.json())
