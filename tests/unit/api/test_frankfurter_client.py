@@ -76,7 +76,7 @@ def test_builds_expected_url_and_query_params(settings, sample_rates):
 
 
 # Validates parsed response models.
-def test_returns_validated_rate_responses(
+def test_returns_raw_payload_and_validated_rate_responses(
         settings: Settings,
         sample_rates: list[dict[str, str]]
 ) -> None:
@@ -94,20 +94,21 @@ def test_returns_validated_rate_responses(
             end_date=date(2026, 1, 31),
         )
 
-    assert isinstance(result, list)
-    assert len(result) == 2
+    assert result.raw_payload == sample_rates
+    assert len(result.rates) == 2
 
+    assert isinstance(result.rates[0], FrankfurterRateResponse)
     assert all(
-        isinstance(item, FrankfurterRateResponse)
-        for item in result
+        isinstance(rate, FrankfurterRateResponse)
+        for rate in result.rates
     )
 
-    assert result[0].base == "EUR"
-    assert result[0].quote == "USD"
-    assert result[0].rate == Decimal("1.1625")
+    assert result.rates[0].base == "EUR"
+    assert result.rates[0].quote == "USD"
+    assert result.rates[0].rate == Decimal("1.1625")
 
-    assert result[1].quote == "GBP"
-    assert result[1].rate == Decimal("0.8650")
+    assert result.rates[1].quote == "GBP"
+    assert result.rates[1].rate == Decimal("0.8650")
 
 
 # Propagates HTTP status errors.

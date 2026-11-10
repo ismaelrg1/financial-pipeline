@@ -1,3 +1,4 @@
+from dataclasses import dataclass
 from datetime import date
 from decimal import Decimal
 from typing import Annotated
@@ -26,3 +27,8 @@ class FrankfurterRateResponse(BaseModel):
         if isinstance(value, str):
             return value.strip().upper()
         return value
+
+@dataclass(frozen=True)
+class FrankfurterRatesFetch:
+    raw_payload: list[dict[str, object]]
+    rates: list[FrankfurterRateResponse]
