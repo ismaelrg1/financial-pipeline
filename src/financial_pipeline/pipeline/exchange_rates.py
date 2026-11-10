@@ -75,7 +75,7 @@ def ingest_exchange_rates(
 
         staging_repository = StagingExchangeRateRepository(session=session)
 
-        ingestion = raw_repository .create_ingestion(
+        ingestion = raw_repository.create_ingestion(
             source_name=FRANKFURTER_SOURCE_NAME,
             provider=provider,
             request_parameters=request_parameters,

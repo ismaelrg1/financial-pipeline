@@ -69,6 +69,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         )
     except ValueError as error:
         parser.error(str(error))
+        return 2
 
     settings = Settings()
 
