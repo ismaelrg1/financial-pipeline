@@ -37,3 +37,18 @@ Constraints:
 - `rate` must be greater than zero.
 - `(rate_date, base_currency, quote_currency, provider)` is unique.
 - Every exchange rate must reference an existing raw ingestion.
+
+## mart.daily_exchange_rate_metrics
+
+Read-only analytical view derived from `staging.exchange_rates`.
+
+- `rate_date`: date of the observed rate
+- `base_currency`
+- `quote_currency`
+- `provider`
+- `rate`
+- `previous_rate`: previous available rate in the same currency/provider series
+- `absolute_change`: `rate - previous_rate`
+- `percentage_change`: percentage variation from `previous_rate`
+
+The first observed rate in each series has `NULL` change metrics.
