@@ -9,7 +9,6 @@ def create_database_engine(database_url: str) -> Engine:
     )
 
 
-
 def create_session_factory(
     engine: Engine,
 ) -> sessionmaker[Session]:
