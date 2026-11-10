@@ -1,5 +1,10 @@
+from collections.abc import Sequence
+
+from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.orm import Session
 
+from financial_pipeline.api.schemas import FrankfurterRateResponse
+from financial_pipeline.db.orm_models import StagingExchangeRate
 from financial_pipeline.db.orm_models import RawApiIngestion
 
 class RawApiIngestionRepository:
@@ -28,3 +33,42 @@ class RawApiIngestionRepository:
         self._session.flush()
 
         return raw_api_ingestion
+
+class StagingExchangeRateRepository:
+    def __init__(self, session: Session) -> None:
+        self._session = session
+
+    def insert_rates_if_absent(
+        self,
+        *,
+        source_ingestion_id: int,
+        provider: str,
+        rates: Sequence[FrankfurterRateResponse],
+    ) -> int:
+        if not rates:
+            return 0
+
+        values = [
+            {
+                "source_ingestion_id": source_ingestion_id,
+                "rate_date": rate.date,
+                "base_currency": rate.base,
+                "quote_currency": rate.quote,
+                "provider": provider,
+                "rate": rate.rate,
+            }
+            for rate in rates
+        ]
+
+        statement = (
+            insert(StagingExchangeRate)
+            .values(values)
+            .on_conflict_do_nothing(
+                constraint="uq_exchange_rates_rate_date_base_quote_provider"
+            )
+            .returning(StagingExchangeRate.exchange_rate_id)
+        )
+
+        result = self._session.execute(statement)
+
+        return len(result.scalars().all())
