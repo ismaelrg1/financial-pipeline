@@ -1,4 +1,5 @@
 from collections.abc import Sequence
+from dataclasses import dataclass
 from datetime import date
 import hashlib
 import json
@@ -6,10 +7,17 @@ import json
 from sqlalchemy.orm import Session, sessionmaker
 
 from financial_pipeline.api.frankfurter_client import FrankfurterClient
-from financial_pipeline.db.repositories import RawApiIngestionRepository
+from financial_pipeline.db.repositories import RawApiIngestionRepository, StagingExchangeRateRepository
 
 
 FRANKFURTER_SOURCE_NAME = "frankfurter"
+
+
+@dataclass(frozen=True)
+class ExchangeRateIngestionResult:
+    ingestion_id: int
+    fetched_rate_count: int
+    inserted_rate_count: int
 
 
 def calculate_payload_hash(
@@ -28,7 +36,7 @@ def calculate_payload_hash(
     return hashlib.sha256(payload_bytes).hexdigest()
 
 
-def ingest_raw_exchange_rates(
+def ingest_exchange_rates(
     *,
     client: FrankfurterClient,
     session_factory: sessionmaker[Session],
@@ -37,8 +45,10 @@ def ingest_raw_exchange_rates(
     quote_currencies: Sequence[str],
     start_date: date,
     end_date: date,
-) -> int:
+) -> ExchangeRateIngestionResult:
+    """Fetch, persist, and stage exchange rates in one transaction."""
 
+    # 1. Fetch data from Frankfurter.
     fetched_rates = client.get_rates(
         base_currency=base_currency,
         quote_currencies=quote_currencies,
@@ -46,6 +56,7 @@ def ingest_raw_exchange_rates(
         end_date=end_date,
     )
 
+    # 2. Build request metadata.
     request_parameters = {
         "base": base_currency,
         "quotes": ",".join(quote_currencies),
@@ -53,14 +64,18 @@ def ingest_raw_exchange_rates(
         "to": end_date.isoformat(),
     }
 
+    # 3. Calculate payload hash.
     payload_hash = calculate_payload_hash(
         fetched_rates.raw_payload
     )
 
+    # 4. Persist raw ingestion and staging rates atomically.
     with session_factory.begin() as session:
-        repository = RawApiIngestionRepository(session=session)
+        raw_repository  = RawApiIngestionRepository(session=session)
 
-        ingestion = repository.create_ingestion(
+        staging_repository = StagingExchangeRateRepository(session=session)
+
+        ingestion = raw_repository .create_ingestion(
             source_name=FRANKFURTER_SOURCE_NAME,
             provider=provider,
             request_parameters=request_parameters,
@@ -70,4 +85,18 @@ def ingest_raw_exchange_rates(
 
         ingestion_id = ingestion.ingestion_id
 
-    return ingestion_id
+        # Insert staging exchange rates.
+        inserted_rate_count = staging_repository.insert_rates_if_absent(
+            source_ingestion_id=ingestion_id,
+            provider=provider,
+            rates=fetched_rates.rates,
+        )
+
+        # Build result.
+        result = ExchangeRateIngestionResult(
+            ingestion_id=ingestion_id,
+            fetched_rate_count=len(fetched_rates.rates),
+            inserted_rate_count=inserted_rate_count,
+        )
+
+    return result
