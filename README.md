@@ -1,7 +1,7 @@
 # Financial Exchange-Rate Pipeline
 
-> **Status:** In progress. API validation, PostgreSQL infrastructure,
-> Alembic migrations, ORM models, and integration tests are implemented.
+> **Status:** Learning project in active development. The first end-to-end
+> version supports validated, idempotent ingestion and analytical metrics.
 
 ## Objective
 
@@ -21,17 +21,14 @@ currency pairs, preserve the original API response for traceability, validate
 and normalize the records, and make them available for analysis without
 creating duplicate records when it is rerun.
 
-## Proposed source
+## Data source
 
-The initial source will be the [Frankfurter v2 API](https://frankfurter.dev/),
-using a documented provider such as ECB. The first currency pairs are:
+The pipeline uses the [Frankfurter v2 API](https://frankfurter.dev/) with the
+ECB provider. The default currency pairs are:
 
 - EUR/USD
 - EUR/GBP
 - EUR/JPY
-
-The exact request parameters and response contract will be verified before
-implementation.
 
 ## Intended data flow
 
@@ -61,6 +58,8 @@ PostgreSQL mart layer      -- daily rates and rate-change metrics
 - Reject empty responses, unexpected base or quote currencies, duplicate
   `(date, base_currency, quote_currency)` keys, and incomplete requested
   quote coverage before persisting data.
+- Validate quote coverage for every date returned by the provider; the
+  pipeline does not invent missing calendar dates for weekends or holidays.
 - Store raw payloads and ingestion metadata for traceability.
 - Normalize valid rates into typed relational records.
 - Load data idempotently using a natural key such as:
@@ -71,7 +70,7 @@ PostgreSQL mart layer      -- daily rates and rate-change metrics
 
 - Compute analytical metrics, including daily rate changes.
 - Expose a repeatable command for one pipeline run.
-- Record useful logs and quality metrics for every execution.
+- Record useful execution logs, including fetched and inserted rate counts.
 
 ## Engineering requirements
 
@@ -92,7 +91,136 @@ deployment are deliberately out of scope for the first version. Scheduling is
 also external to the pipeline: the initial implementation will be run manually
 and made idempotent before evaluating a local scheduler.
 
-## Planned milestones
+## Project structure
+
+```text
+.
+├── alembic/                    # Database migrations
+├── docs/data-model.md           # Schemas, constraints, and mart contract
+├── src/financial_pipeline/
+│   ├── api/                     # Frankfurter client and API schemas
+│   ├── db/                      # ORM models, repositories, and sessions
+│   ├── domain/                  # Business-level validation rules
+│   ├── pipeline/                # Ingestion orchestration
+│   ├── config.py                # Environment-based settings
+│   └── main.py                  # Command-line entry point
+├── tests/unit/                  # Isolated tests without PostgreSQL
+├── tests/integration/           # PostgreSQL-backed tests
+├── compose.yaml
+└── .env.example
+```
+
+See [the data model](docs/data-model.md) for the `raw`, `staging`, and `mart`
+contracts.
+
+## Local setup
+
+### Prerequisites
+
+- Python 3.12 or newer.
+- [uv](https://docs.astral.sh/uv/).
+- Docker Engine with Docker Compose.
+
+### Configure the environment
+
+Create a local configuration file and install the locked dependencies:
+
+```bash
+cp .env.example .env
+uv sync
+```
+
+`.env` contains local PostgreSQL credentials. Keep it local and change the
+example password before using this configuration outside local development.
+
+### Start PostgreSQL
+
+```bash
+docker compose up -d
+docker compose ps
+```
+
+The `postgres_data` Docker volume preserves local database data when the
+container is recreated. Stop the service without deleting that volume with:
+
+```bash
+docker compose down
+```
+
+### Create and migrate the databases
+
+Apply migrations to the development database:
+
+```bash
+uv run alembic upgrade head
+```
+
+Integration tests use a separate database named `financial_pipeline_test`.
+Create it once after PostgreSQL is running:
+
+```bash
+docker compose exec postgres sh -c \
+  'createdb -U "$POSTGRES_USER" financial_pipeline_test'
+```
+
+If PostgreSQL reports that the database already exists, continue with the next
+command. Export the variables in `.env`, then apply the same migrations to the
+test database:
+
+```bash
+set -a
+source .env
+set +a
+
+FINANCIAL_PIPELINE_DATABASE_URL="$TEST_DATABASE_URL" \
+  uv run alembic upgrade head
+```
+
+## Run the pipeline
+
+Fetch rates for an inclusive date range:
+
+```bash
+uv run python -m financial_pipeline.main \
+  --start-date 2026-01-15 \
+  --end-date 2026-01-15
+```
+
+The command writes one traceable raw-ingestion row for each execution. The
+staging natural key prevents duplicate exchange-rate rows on reruns with the
+same rates.
+
+Inspect the analytical mart with:
+
+```bash
+docker compose exec postgres sh -c \
+  'psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -P pager=off -c \
+  "SELECT * FROM mart.daily_exchange_rate_metrics ORDER BY rate_date, quote_currency;"'
+```
+
+## Tests and quality checks
+
+The test database URL must be exported before running the complete test suite:
+
+```bash
+set -a
+source .env
+set +a
+
+uv run pytest
+uv run ruff check .
+uv run ruff format --check .
+uv run pyright
+uv run alembic check
+```
+
+Run only unit tests without PostgreSQL with:
+
+```bash
+uv run pytest -m "not integration"
+```
+
+## Implemented milestones
 
 1. Define the API contract, relational model, and architecture.
 2. Initialize the Python package, dependencies, configuration, and tests.
@@ -103,6 +231,7 @@ and made idempotent before evaluating a local scheduler.
 
 ## Definition of done
 
-The project is complete when a fresh local environment can start PostgreSQL,
-apply migrations, execute the pipeline repeatedly without duplicates, run the
-test suite and quality checks, and reproduce documented analytical outputs.
+The first project version is complete when a fresh local environment can start
+PostgreSQL, apply migrations, execute the pipeline repeatedly without
+duplicates, run the test suite and quality checks, and reproduce documented
+analytical outputs.

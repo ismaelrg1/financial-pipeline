@@ -5,7 +5,6 @@ from typing import Annotated
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
-# patron moneda "EUR" "USD"..
 CurrencyCode = Annotated[
     str,
     Field(min_length=3, max_length=3, pattern=r"^[A-Z]{3}$"),
@@ -23,7 +22,7 @@ class FrankfurterRateResponse(BaseModel):
     @field_validator("base", "quote", mode="before")
     @classmethod
     def normalize_currency(cls, value: object) -> object:
-        """Normalize currency text before Literal validation."""
+        """Normalize currency text before currency-code validation."""
         if isinstance(value, str):
             return value.strip().upper()
         return value
