@@ -1,14 +1,17 @@
+import hashlib
+import json
 from collections.abc import Sequence
 from dataclasses import dataclass
 from datetime import date
-import hashlib
-import json
 
 from sqlalchemy.orm import Session, sessionmaker
 
 from financial_pipeline.api.frankfurter_client import FrankfurterClient
-from financial_pipeline.db.repositories import RawApiIngestionRepository, StagingExchangeRateRepository
-
+from financial_pipeline.db.repositories import (
+    RawApiIngestionRepository,
+    StagingExchangeRateRepository,
+)
+from financial_pipeline.domain.quality import validate_exchange_rate_coverage
 
 FRANKFURTER_SOURCE_NAME = "frankfurter"
 
@@ -56,6 +59,13 @@ def ingest_exchange_rates(
         end_date=end_date,
     )
 
+    # 1.5. Validate the exchange-rate coverage contract.
+    validate_exchange_rate_coverage(
+        rates=fetched_rates.rates,
+        expected_base_currency=base_currency,
+        expected_quote_currencies=quote_currencies,
+    )
+
     # 2. Build request metadata.
     request_parameters = {
         "base": base_currency,
@@ -65,13 +75,11 @@ def ingest_exchange_rates(
     }
 
     # 3. Calculate payload hash.
-    payload_hash = calculate_payload_hash(
-        fetched_rates.raw_payload
-    )
+    payload_hash = calculate_payload_hash(fetched_rates.raw_payload)
 
     # 4. Persist raw ingestion and staging rates atomically.
     with session_factory.begin() as session:
-        raw_repository  = RawApiIngestionRepository(session=session)
+        raw_repository = RawApiIngestionRepository(session=session)
 
         staging_repository = StagingExchangeRateRepository(session=session)
 

@@ -1,11 +1,23 @@
-from datetime import datetime, date
+from datetime import date, datetime
 from decimal import Decimal
 
-from sqlalchemy import BigInteger, DateTime, Date, Identity, ForeignKey, String, func, Numeric, CheckConstraint, UniqueConstraint
-from sqlalchemy.orm import Mapped, mapped_column, relationship
+from sqlalchemy import (
+    BigInteger,
+    CheckConstraint,
+    Date,
+    DateTime,
+    ForeignKey,
+    Identity,
+    Numeric,
+    String,
+    UniqueConstraint,
+    func,
+)
 from sqlalchemy.dialects.postgresql import JSONB
+from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from financial_pipeline.db.base import Base
+
 
 class RawApiIngestion(Base):
     __tablename__ = "api_ingestions"
@@ -17,7 +29,9 @@ class RawApiIngestion(Base):
         {"schema": "raw"},
     )
 
-    ingestion_id: Mapped[int] = mapped_column(BigInteger, Identity(always=True), primary_key=True)
+    ingestion_id: Mapped[int] = mapped_column(
+        BigInteger, Identity(always=True), primary_key=True
+    )
 
     source_name: Mapped[str] = mapped_column(String(50), nullable=False)
 
@@ -25,7 +39,9 @@ class RawApiIngestion(Base):
 
     request_parameters: Mapped[dict[str, str]] = mapped_column(JSONB, nullable=False)
 
-    response_payload: Mapped[list[dict[str, object]]] = mapped_column(JSONB, nullable=False)
+    response_payload: Mapped[list[dict[str, object]]] = mapped_column(
+        JSONB, nullable=False
+    )
 
     payload_hash: Mapped[str] = mapped_column(String(64), nullable=False)
 
@@ -39,7 +55,6 @@ class RawApiIngestion(Base):
     exchange_rates: Mapped[list["StagingExchangeRate"]] = relationship(
         back_populates="source_ingestion",
     )
-
 
 
 class StagingExchangeRate(Base):
@@ -71,11 +86,12 @@ class StagingExchangeRate(Base):
         {"schema": "staging"},
     )
 
-    exchange_rate_id: Mapped[int] = mapped_column(BigInteger, Identity(always=True), primary_key=True)
+    exchange_rate_id: Mapped[int] = mapped_column(
+        BigInteger, Identity(always=True), primary_key=True
+    )
 
     source_ingestion_id: Mapped[int] = mapped_column(
-        ForeignKey("raw.api_ingestions.ingestion_id"),
-        nullable=False
+        ForeignKey("raw.api_ingestions.ingestion_id"), nullable=False
     )
 
     rate_date: Mapped[date] = mapped_column(

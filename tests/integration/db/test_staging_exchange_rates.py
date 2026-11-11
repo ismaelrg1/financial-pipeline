@@ -2,6 +2,7 @@ from datetime import date
 from decimal import Decimal
 
 import pytest
+from factories import build_exchange_rate
 from sqlalchemy import select
 from sqlalchemy.exc import DataError, IntegrityError
 from sqlalchemy.orm import Session, selectinload
@@ -10,8 +11,6 @@ from financial_pipeline.db.orm_models import (
     RawApiIngestion,
     StagingExchangeRate,
 )
-from factories import build_exchange_rate
-
 
 pytestmark = pytest.mark.integration
 
@@ -73,18 +72,14 @@ def test_persists_relationship_between_ingestion_and_rates(
     result = db_session.scalar(
         select(RawApiIngestion)
         .options(selectinload(RawApiIngestion.exchange_rates))
-        .where(
-            RawApiIngestion.ingestion_id
-            == persisted_raw_ingestion.ingestion_id
-        )
+        .where(RawApiIngestion.ingestion_id == persisted_raw_ingestion.ingestion_id)
     )
 
     assert result is not None
     assert len(result.exchange_rates) == 2
 
     assert {
-        exchange_rate.quote_currency
-        for exchange_rate in result.exchange_rates
+        exchange_rate.quote_currency for exchange_rate in result.exchange_rates
     } == {"USD", "GBP"}
 
     assert all(
@@ -167,8 +162,8 @@ def test_rejects_same_base_and_quote_currency(
 @pytest.mark.parametrize(
     "invalid_rate",
     [
-        Decimal("0"),
-        Decimal("-1"),
+        Decimal(0),
+        Decimal(-1),
         Decimal("-0.5"),
     ],
 )
@@ -242,6 +237,7 @@ def test_rejects_base_currency_longer_than_column_limit(
         db_session.flush()
 
     db_session.rollback()
+
 
 def test_rejects_quote_currency_longer_than_column_limit(
     db_session: Session,

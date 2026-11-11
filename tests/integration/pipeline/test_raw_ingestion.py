@@ -3,22 +3,23 @@ from decimal import Decimal
 from unittest.mock import Mock
 
 import pytest
-from sqlalchemy import delete, select, func
+from sqlalchemy import delete, func, select
 from sqlalchemy.engine import Engine
 from sqlalchemy.exc import IntegrityError
 
 from financial_pipeline.api.frankfurter_client import FrankfurterClient
-from financial_pipeline.db.orm_models import RawApiIngestion, StagingExchangeRate
-from financial_pipeline.db.session import create_session_factory
-from financial_pipeline.pipeline.exchange_rates import (
-    ExchangeRateIngestionResult,
-    FRANKFURTER_SOURCE_NAME,
-    calculate_payload_hash,
-    ingest_exchange_rates,
-)
 from financial_pipeline.api.schemas import (
     FrankfurterRateResponse,
     FrankfurterRatesFetch,
+)
+from financial_pipeline.db.orm_models import RawApiIngestion, StagingExchangeRate
+from financial_pipeline.db.session import create_session_factory
+from financial_pipeline.domain.quality import ExchangeRateQualityError
+from financial_pipeline.pipeline.exchange_rates import (
+    FRANKFURTER_SOURCE_NAME,
+    ExchangeRateIngestionResult,
+    calculate_payload_hash,
+    ingest_exchange_rates,
 )
 
 pytestmark = pytest.mark.integration
@@ -42,8 +43,7 @@ def test_ingest_exchange_rates_persists_raw_and_staging(engine: Engine) -> None:
     ]
 
     validated_rates = [
-        FrankfurterRateResponse.model_validate(rate)
-        for rate in raw_payload
+        FrankfurterRateResponse.model_validate(rate) for rate in raw_payload
     ]
 
     client = Mock(spec=FrankfurterClient)
@@ -97,9 +97,7 @@ def test_ingest_exchange_rates_persists_raw_and_staging(engine: Engine) -> None:
             # Verificar staging exchange rates
             statement = (
                 select(StagingExchangeRate)
-                .where(
-                    StagingExchangeRate.source_ingestion_id == ingestion_id
-                )
+                .where(StagingExchangeRate.source_ingestion_id == ingestion_id)
                 .order_by(StagingExchangeRate.quote_currency)
             )
 
@@ -116,7 +114,6 @@ def test_ingest_exchange_rates_persists_raw_and_staging(engine: Engine) -> None:
             assert gbp_rate.quote_currency == "GBP"
             assert gbp_rate.provider == "ECB"
             assert gbp_rate.rate == Decimal("0.8652")
-
 
             # USD
             usd_rate = staging_rates[1]
@@ -171,8 +168,7 @@ def test_ingest_exchange_rates_keeps_staging_idempotent(
     ]
 
     validated_rates = [
-        FrankfurterRateResponse.model_validate(rate)
-        for rate in raw_payload
+        FrankfurterRateResponse.model_validate(rate) for rate in raw_payload
     ]
 
     client = Mock(spec=FrankfurterClient)
@@ -235,17 +231,13 @@ def test_ingest_exchange_rates_keeps_staging_idempotent(
 
             assert len(raw_ingestions) == 2
 
-            raw_ingestion_ids = {
-                ingestion.ingestion_id for ingestion in raw_ingestions
-            }
+            raw_ingestion_ids = {ingestion.ingestion_id for ingestion in raw_ingestions}
             assert raw_ingestion_ids == set(ingestion_ids)
 
             # Verify staging: only the first execution inserted rates
             staging_rates = session.scalars(
                 select(StagingExchangeRate)
-                .where(
-                    StagingExchangeRate.source_ingestion_id.in_(ingestion_ids)
-                )
+                .where(StagingExchangeRate.source_ingestion_id.in_(ingestion_ids))
                 .order_by(StagingExchangeRate.quote_currency)
             ).all()
 
@@ -266,9 +258,9 @@ def test_ingest_exchange_rates_keeps_staging_idempotent(
             assert usd_rate.rate == Decimal("1.1625")
 
             # Both staging rows must reference the first ingestion
-            assert {
-                rate.source_ingestion_id for rate in staging_rates
-            } == {first_result.ingestion_id}
+            assert {rate.source_ingestion_id for rate in staging_rates} == {
+                first_result.ingestion_id
+            }
 
             assert all(
                 rate.source_ingestion_id != second_result.ingestion_id
@@ -286,9 +278,7 @@ def test_ingest_exchange_rates_keeps_staging_idempotent(
             with session_factory.begin() as session:
                 session.execute(
                     delete(StagingExchangeRate).where(
-                        StagingExchangeRate.source_ingestion_id.in_(
-                            ingestion_ids
-                        )
+                        StagingExchangeRate.source_ingestion_id.in_(ingestion_ids)
                     )
                 )
 
@@ -352,3 +342,77 @@ def test_ingest_exchange_rates_rolls_back_raw_when_staging_insert_fails(
         )
 
     assert raw_ingestion_count == 0
+
+
+def test_ingest_exchange_rates_does_not_persist_invalid_rate_coverage(
+    engine: Engine,
+) -> None:
+    # Arrange
+    raw_payload = [
+        {
+            "date": "2026-03-15",
+            "base": "EUR",
+            "quote": "USD",
+            "rate": 1.2345,
+        },
+        {
+            "date": "2026-03-15",
+            "base": "EUR",
+            "quote": "GBP",
+            "rate": 0.8765,
+        },
+    ]
+
+    validated_rates = [
+        FrankfurterRateResponse.model_validate(rate) for rate in raw_payload
+    ]
+
+    client = Mock(spec=FrankfurterClient)
+    client.get_rates.return_value = FrankfurterRatesFetch(
+        raw_payload=raw_payload,
+        rates=validated_rates,
+    )
+
+    session_factory = create_session_factory(engine)
+
+    payload_hash = calculate_payload_hash(raw_payload)
+
+    # Act & Assert
+    with pytest.raises(
+        ExchangeRateQualityError,
+        match="Incomplete quote coverage for 2026-03-15: missing JPY",
+    ):
+        ingest_exchange_rates(
+            client=client,
+            session_factory=session_factory,
+            provider="test_quality_validation",
+            base_currency="EUR",
+            quote_currencies=["USD", "GBP", "JPY"],
+            start_date=date(2026, 3, 15),
+            end_date=date(2026, 3, 15),
+        )
+
+    # Assert: no raw ingestion was persisted
+    with session_factory() as session:
+        raw_count = session.scalar(
+            select(func.count())
+            .select_from(RawApiIngestion)
+            .where(RawApiIngestion.payload_hash == payload_hash)
+        )
+
+        assert raw_count == 0
+
+        # Assert: no staging rows were persisted for this ingestion
+        staging_count = session.scalar(
+            select(func.count())
+            .select_from(StagingExchangeRate)
+            .join(
+                RawApiIngestion,
+                StagingExchangeRate.source_ingestion_id == RawApiIngestion.ingestion_id,
+            )
+            .where(RawApiIngestion.payload_hash == payload_hash)
+        )
+
+        assert staging_count == 0
+
+    client.get_rates.assert_called_once()

@@ -1,10 +1,8 @@
 import pytest
-
 from sqlalchemy.orm import Session
 
 from financial_pipeline.db.orm_models import RawApiIngestion
 from financial_pipeline.db.repositories import RawApiIngestionRepository
-
 
 pytestmark = pytest.mark.integration
 

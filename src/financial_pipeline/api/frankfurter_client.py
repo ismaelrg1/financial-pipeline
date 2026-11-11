@@ -4,9 +4,11 @@ from datetime import date
 import httpx
 from pydantic import TypeAdapter
 
-from financial_pipeline.api.schemas import FrankfurterRateResponse, FrankfurterRatesFetch
+from financial_pipeline.api.schemas import (
+    FrankfurterRateResponse,
+    FrankfurterRatesFetch,
+)
 from financial_pipeline.config import Settings
-
 
 raw_payload_adapter = TypeAdapter(list[dict[str, object]])
 rate_list_adapter = TypeAdapter(list[FrankfurterRateResponse])
@@ -21,10 +23,9 @@ class FrankfurterClient:
         self._http_client = http_client
         self._settings = settings
 
-
     def get_rates(
-        self, 
-        *, 
+        self,
+        *,
         base_currency: str,
         quote_currencies: Sequence[str],
         start_date: date,
@@ -35,7 +36,7 @@ class FrankfurterClient:
             f"{self._settings.frankfurter_api_base_url}"
             f"/providers/{self._settings.frankfurter_provider}/rates"
         )
-        
+
         response = self._http_client.get(
             url,
             params={

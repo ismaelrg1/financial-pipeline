@@ -1,10 +1,9 @@
 import pytest
+from factories import build_raw_api_ingestion
 from sqlalchemy.exc import DataError, IntegrityError
 from sqlalchemy.orm import Session
 
 from financial_pipeline.db.orm_models import RawApiIngestion
-from factories import build_raw_api_ingestion
-
 
 pytestmark = pytest.mark.integration
 

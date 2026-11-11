@@ -1,9 +1,10 @@
 from collections.abc import Callable
+
 import pytest
+from factories import build_raw_api_ingestion
 from sqlalchemy.orm import Session
 
 from financial_pipeline.db.orm_models import RawApiIngestion
-from factories import build_raw_api_ingestion
 
 
 @pytest.fixture
@@ -16,6 +17,7 @@ def persisted_raw_ingestion(
     db_session.flush()
 
     return ingestion
+
 
 @pytest.fixture
 def raw_ingestion_factory(

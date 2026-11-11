@@ -1,18 +1,18 @@
 import argparse
 from datetime import date
 from types import SimpleNamespace
-
 from unittest.mock import MagicMock, Mock
+
 import httpx
 import pytest
 
+import financial_pipeline.main as main_module
+from financial_pipeline.domain.quality import ExchangeRateQualityError
 from financial_pipeline.main import (
     build_argument_parser,
     parse_iso_date,
     validate_date_range,
 )
-
-import financial_pipeline.main as main_module
 
 
 def test_parse_iso_date_returns_date() -> None:
@@ -168,9 +168,7 @@ def test_main_returns_one_when_http_request_fails(
 ) -> None:
     dependencies = configure_main_dependencies(monkeypatch)
 
-    ingest_mock = Mock(
-        side_effect=httpx.ConnectError("Connection failed")
-    )
+    ingest_mock = Mock(side_effect=httpx.ConnectError("Connection failed"))
     monkeypatch.setattr(
         main_module,
         "ingest_exchange_rates",
@@ -225,3 +223,41 @@ def test_main_exits_with_code_two_when_date_range_is_invalid(
 
     # The application must reject the dates before initializing dependencies.
     settings_mock.assert_not_called()
+
+
+def test_main_returns_one_when_exchange_rate_quality_validation_fails(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    dependencies = configure_main_dependencies(monkeypatch)
+
+    ingest_mock = Mock(
+        side_effect=ExchangeRateQualityError("No exchange rates were returned")
+    )
+    monkeypatch.setattr(
+        main_module,
+        "ingest_exchange_rates",
+        ingest_mock,
+    )
+
+    result = main_module.main(
+        [
+            "--start-date",
+            "2026-01-01",
+            "--end-date",
+            "2026-01-31",
+        ]
+    )
+
+    assert result == 1
+
+    ingest_mock.assert_called_once_with(
+        client=dependencies["frankfurter_client"],
+        session_factory=dependencies["session_factory"],
+        provider="ECB",
+        base_currency="EUR",
+        quote_currencies=["USD", "GBP"],
+        start_date=date(2026, 1, 1),
+        end_date=date(2026, 1, 31),
+    )
+
+    dependencies["engine"].dispose.assert_called_once()

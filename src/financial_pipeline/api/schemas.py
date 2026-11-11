@@ -14,7 +14,7 @@ CurrencyCode = Annotated[
 
 class FrankfurterRateResponse(BaseModel):
     model_config = ConfigDict(extra="forbid")
-    
+
     date: date
     base: CurrencyCode
     quote: CurrencyCode
@@ -27,6 +27,7 @@ class FrankfurterRateResponse(BaseModel):
         if isinstance(value, str):
             return value.strip().upper()
         return value
+
 
 @dataclass(frozen=True)
 class FrankfurterRatesFetch:

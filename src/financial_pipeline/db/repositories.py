@@ -4,8 +4,8 @@ from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.orm import Session
 
 from financial_pipeline.api.schemas import FrankfurterRateResponse
-from financial_pipeline.db.orm_models import StagingExchangeRate
-from financial_pipeline.db.orm_models import RawApiIngestion
+from financial_pipeline.db.orm_models import RawApiIngestion, StagingExchangeRate
+
 
 class RawApiIngestionRepository:
     def __init__(self, session: Session) -> None:
@@ -33,6 +33,7 @@ class RawApiIngestionRepository:
         self._session.flush()
 
         return raw_api_ingestion
+
 
 class StagingExchangeRateRepository:
     def __init__(self, session: Session) -> None:

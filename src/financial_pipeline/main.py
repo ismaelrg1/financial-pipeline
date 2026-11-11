@@ -1,16 +1,17 @@
 import argparse
+import logging
 from collections.abc import Sequence
 from datetime import date
-import httpx
-import logging
 
+import httpx
 from pydantic import ValidationError
 from sqlalchemy.exc import SQLAlchemyError
 
-from financial_pipeline.config import Settings
-from financial_pipeline.logging_config import configure_logging
-from financial_pipeline.db.session import create_database_engine, create_session_factory
 from financial_pipeline.api.frankfurter_client import FrankfurterClient
+from financial_pipeline.config import Settings
+from financial_pipeline.db.session import create_database_engine, create_session_factory
+from financial_pipeline.domain.quality import ExchangeRateQualityError
+from financial_pipeline.logging_config import configure_logging
 from financial_pipeline.pipeline.exchange_rates import ingest_exchange_rates
 
 logger = logging.getLogger(__name__)
@@ -34,14 +35,14 @@ def build_argument_parser() -> argparse.ArgumentParser:
         "--start-date",
         type=parse_iso_date,
         required=True,
-        help="Start date in ISO format (YYYY-MM-DD)."
+        help="Start date in ISO format (YYYY-MM-DD).",
     )
 
     parser.add_argument(
         "--end-date",
         type=parse_iso_date,
         required=True,
-        help="End date in ISO format (YYYY-MM-DD)."
+        help="End date in ISO format (YYYY-MM-DD).",
     )
 
     return parser
@@ -71,21 +72,16 @@ def main(argv: Sequence[str] | None = None) -> int:
         parser.error(str(error))
         return 2
 
-    settings = Settings()
+    settings = Settings()  # pyright: ignore[reportCallIssue]  # Loaded from environment.
 
     configure_logging(settings.log_level)
 
-    engine = create_database_engine(
-        settings.database_url
-    )
+    engine = create_database_engine(settings.database_url)
 
     session_factory = create_session_factory(engine)
 
     try:
-        with httpx.Client(
-            timeout=settings.http_timeout_seconds
-        ) as http_client:
-
+        with httpx.Client(timeout=settings.http_timeout_seconds) as http_client:
             client = FrankfurterClient(
                 http_client=http_client,
                 settings=settings,
@@ -114,6 +110,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         httpx.HTTPError,
         ValidationError,
         SQLAlchemyError,
+        ExchangeRateQualityError,
     ):
         logger.exception("Pipeline failed")
         return 1

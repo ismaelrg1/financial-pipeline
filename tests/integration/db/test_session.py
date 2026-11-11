@@ -1,12 +1,11 @@
 import pytest
-
 from sqlalchemy import text
 from sqlalchemy.engine import Engine
 
 from financial_pipeline.db.session import create_session_factory
 
-
 pytestmark = pytest.mark.integration
+
 
 def test_session_factory_can_execute_query(engine: Engine) -> None:
     session_factory = create_session_factory(engine)

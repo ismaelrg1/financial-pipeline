@@ -11,20 +11,20 @@ from financial_pipeline.config import Settings
 BASE_URL = "https://api.frankfurter.dev/v2"
 PROVIDER = "ECB"
 DATABASE_URL = (
-    "postgresql+psycopg://test_user:"
-    "test_password@localhost:5432/test_database"
+    "postgresql+psycopg://test_user:test_password@localhost:5432/test_database"
 )
+
 
 # Fake settings without loading the real .env file.
 @pytest.fixture
 def settings() -> Settings:
-    """Fake settings without loading the real .env file."""
+    """Build settings for the Frankfurter client tests."""
     return Settings(
-        _env_file=None,
         frankfurter_api_base_url=BASE_URL,
         frankfurter_provider=PROVIDER,
         database_url=DATABASE_URL,
     )
+
 
 # Valid API response payload.
 @pytest.fixture
@@ -43,6 +43,7 @@ def sample_rates() -> list[dict[str, str]]:
             "rate": "0.8650",
         },
     ]
+
 
 # Verifies URL and query parameters.
 def test_builds_expected_url_and_query_params(settings, sample_rates):
@@ -77,8 +78,7 @@ def test_builds_expected_url_and_query_params(settings, sample_rates):
 
 # Validates parsed response models.
 def test_returns_raw_payload_and_validated_rate_responses(
-        settings: Settings,
-        sample_rates: list[dict[str, str]]
+    settings: Settings, sample_rates: list[dict[str, str]]
 ) -> None:
     transport = httpx.MockTransport(
         lambda request: httpx.Response(200, json=sample_rates)
@@ -98,10 +98,7 @@ def test_returns_raw_payload_and_validated_rate_responses(
     assert len(result.rates) == 2
 
     assert isinstance(result.rates[0], FrankfurterRateResponse)
-    assert all(
-        isinstance(rate, FrankfurterRateResponse)
-        for rate in result.rates
-    )
+    assert all(isinstance(rate, FrankfurterRateResponse) for rate in result.rates)
 
     assert result.rates[0].base == "EUR"
     assert result.rates[0].quote == "USD"

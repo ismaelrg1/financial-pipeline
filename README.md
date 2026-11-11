@@ -42,6 +42,9 @@ Frankfurter API
 Python extractor and Pydantic validation
       |
       v
+Domain quality validation
+      |
+      v
 PostgreSQL raw layer       -- original payload and ingestion metadata
       |
       v
@@ -55,6 +58,9 @@ PostgreSQL mart layer      -- daily rates and rate-change metrics
 
 - Extract historical and recent exchange rates for the selected pairs.
 - Validate external API payloads at the ingestion boundary with Pydantic v2.
+- Reject empty responses, unexpected base or quote currencies, duplicate
+  `(date, base_currency, quote_currency)` keys, and incomplete requested
+  quote coverage before persisting data.
 - Store raw payloads and ingestion metadata for traceability.
 - Normalize valid rates into typed relational records.
 - Load data idempotently using a natural key such as:

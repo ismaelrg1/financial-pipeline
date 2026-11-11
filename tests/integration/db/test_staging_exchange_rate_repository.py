@@ -11,9 +11,7 @@ from financial_pipeline.db.orm_models import (
     RawApiIngestion,
     StagingExchangeRate,
 )
-
 from financial_pipeline.db.repositories import StagingExchangeRateRepository
-
 
 pytestmark = pytest.mark.integration
 

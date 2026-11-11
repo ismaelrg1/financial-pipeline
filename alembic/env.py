@@ -1,10 +1,8 @@
 from logging.config import fileConfig
 
-from sqlalchemy import engine_from_config
-from sqlalchemy import pool
+from sqlalchemy import engine_from_config, pool
 
 from alembic import context
-
 from financial_pipeline.config import Settings
 from financial_pipeline.db import orm_models  # noqa: F401
 from financial_pipeline.db.base import Base
@@ -13,7 +11,7 @@ from financial_pipeline.db.base import Base
 # access to the values within the .ini file in use.
 config = context.config
 
-settings = Settings()
+settings = Settings()  # pyright: ignore[reportCallIssue]  # Loaded from environment.
 config.set_main_option("sqlalchemy.url", settings.database_url)
 
 # Interpret the config file for Python logging.

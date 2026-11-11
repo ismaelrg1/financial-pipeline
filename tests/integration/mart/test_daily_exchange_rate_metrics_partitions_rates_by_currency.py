@@ -10,7 +10,6 @@ from financial_pipeline.db.orm_models import (
     StagingExchangeRate,
 )
 
-
 pytestmark = pytest.mark.integration
 
 
@@ -127,4 +126,4 @@ def test_daily_exchange_rate_metrics_partitions_rates_by_currency(
     assert usd_current_day["quote_currency"] == "USD"
     assert usd_current_day["previous_rate"] == Decimal("1.00000000")
     assert usd_current_day["absolute_change"] == Decimal("0.10000000")
-    assert usd_current_day["percentage_change"] == Decimal("10")
+    assert usd_current_day["percentage_change"] == Decimal(10)

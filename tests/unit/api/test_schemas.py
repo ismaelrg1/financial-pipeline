@@ -6,6 +6,7 @@ from pydantic import ValidationError
 
 from financial_pipeline.api.schemas import FrankfurterRateResponse
 
+
 def build_rate_payload(**overrides: object) -> dict[str, object]:
     payload: dict[str, object] = {
         "date": "2026-01-15",
@@ -26,18 +27,16 @@ def build_rate_payload(**overrides: object) -> dict[str, object]:
     ],
 )
 def test_converts_date_and_rate_types(
-    raw_rate: str | float,
-    expected_rate: Decimal
+    raw_rate: str | float, expected_rate: Decimal
 ) -> None:
-    result = FrankfurterRateResponse.model_validate(
-        build_rate_payload(rate=raw_rate)
-    )
+    result = FrankfurterRateResponse.model_validate(build_rate_payload(rate=raw_rate))
 
     assert result.date == date(2026, 1, 15)
     assert isinstance(result.date, date)
 
     assert result.rate == expected_rate
     assert isinstance(result.rate, Decimal)
+
 
 # test normalizacion EUR/USD...
 @pytest.mark.parametrize(
@@ -49,7 +48,7 @@ def test_converts_date_and_rate_types(
     ],
 )
 def test_normalizes_currency_codes(
-    base: str, 
+    base: str,
     quote: str,
     expected_base: str,
     expected_quote: str,
@@ -65,14 +64,13 @@ def test_normalizes_currency_codes(
 
 # test de decimales negativos:
 @pytest.mark.parametrize("rate", ["0", "0.0", "-1", "-0.5", None])
-def test_rejects_zero_or_negative_rate(
-    rate: str | None
-) -> None:
+def test_rejects_zero_or_negative_rate(rate: str | None) -> None:
 
     with pytest.raises(ValidationError):
         FrankfurterRateResponse.model_validate(
             build_rate_payload(rate=rate),
         )
+
 
 def test_rejects_missing_rate_field() -> None:
     payload = build_rate_payload()
@@ -106,11 +104,11 @@ def test_rejects_invalid_currency_codes(
     currency: str,
 ) -> None:
 
-
     with pytest.raises(ValidationError):
         FrankfurterRateResponse.model_validate(
             build_rate_payload(**{field_name: currency}),
         )
+
 
 def test_rejects_unexpected_fields() -> None:
     with pytest.raises(ValidationError):

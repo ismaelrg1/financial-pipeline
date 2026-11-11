@@ -10,7 +10,6 @@ from financial_pipeline.db.orm_models import (
     StagingExchangeRate,
 )
 
-
 pytestmark = pytest.mark.integration
 
 
@@ -120,11 +119,11 @@ def test_daily_exchange_rate_metrics_calculates_changes(
     assert second_day["rate"] == Decimal("1.10000000")
     assert second_day["previous_rate"] == Decimal("1.00000000")
     assert second_day["absolute_change"] == Decimal("0.10000000")
-    assert second_day["percentage_change"] == Decimal("10")
+    assert second_day["percentage_change"] == Decimal(10)
 
     # 2026-01-14: Negative change
     assert third_day["rate_date"] == date(2026, 1, 14)
     assert third_day["rate"] == Decimal("1.04500000")
     assert third_day["previous_rate"] == Decimal("1.10000000")
     assert third_day["absolute_change"] == Decimal("-0.05500000")
-    assert third_day["percentage_change"] == Decimal("-5")
+    assert third_day["percentage_change"] == Decimal(-5)
